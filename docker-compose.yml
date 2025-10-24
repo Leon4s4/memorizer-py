@@ -1,0 +1,32 @@
+version: '3.8'
+
+# Air-gapped deployment configuration (DEFAULT)
+# Uses Dockerfile which includes ALL models (air-gapped by default as of v2.0)
+
+services:
+  memorizer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: memorizer:latest
+    container_name: memorizer
+    restart: unless-stopped
+    ports:
+      - "9000:8000"  # API (host:container)
+      - "8501:8501"  # Streamlit UI
+    volumes:
+      - memorizer-data:/app/data
+    environment:
+      - MEMORIZER_ENVIRONMENT=production
+      - MEMORIZER_ENABLE_BACKGROUND_JOBS=true
+      - CHROMA_TELEMETRY_IMPL=none
+      - PYTORCH_ENABLE_MPS_FALLBACK=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  memorizer-data:

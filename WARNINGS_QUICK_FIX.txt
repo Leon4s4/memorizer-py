@@ -1,0 +1,87 @@
+================================================================================
+MEMORIZER - STARTUP WARNINGS QUICK REFERENCE
+================================================================================
+
+Those warnings you see are HARMLESS! Here's what they are:
+
+1. "Failed to send telemetry event"
+   → ChromaDB telemetry version mismatch
+   → IMPACT: None - ChromaDB works perfectly
+
+2. "Examining the path of torch.classes"
+   → PyTorch looking for optional features
+   → IMPACT: None - Embeddings work perfectly
+
+3. "ggml_metal_init: skipping kernel_*_bf16"
+   → Your Mac's GPU doesn't support bfloat16
+   → IMPACT: None - LLM uses fp16 instead (just as fast!)
+
+ALL SYSTEMS ARE WORKING CORRECTLY! ✅
+
+================================================================================
+HOW TO SUPPRESS WARNINGS (OPTIONAL)
+================================================================================
+
+Method 1: Set environment variables
+------------------------------------
+export CHROMA_TELEMETRY_IMPL=none
+export PYTORCH_ENABLE_MPS_FALLBACK=1
+python app.py
+
+Method 2: Create a .env file
+-----------------------------
+cd memorizer-python
+cp .env.example .env
+
+The .env.example already includes these settings:
+- CHROMA_TELEMETRY_IMPL=none
+- PYTORCH_ENABLE_MPS_FALLBACK=1
+
+Method 3: Redirect warnings to log file
+----------------------------------------
+python app.py 2> startup_warnings.log
+
+================================================================================
+VERIFY EVERYTHING WORKS
+================================================================================
+
+Run this test:
+
+cd memorizer-python
+python -c "
+from services import get_storage_service
+from models import Memory
+
+storage = get_storage_service()
+print('✅ ChromaDB initialized')
+
+memory = Memory(type='test', content={'text': 'test'}, source='test', title='Test')
+created = storage.create(memory)
+print('✅ Storage works')
+
+results = storage.search('test', limit=1)
+print('✅ Search works')
+
+print('\n🎉 Everything is working perfectly!')
+"
+
+If you see the ✅ messages, ignore the warnings - your system is perfect!
+
+================================================================================
+BOTTOM LINE
+================================================================================
+
+❌ DON'T WORRY about:
+   - ChromaDB telemetry warnings
+   - PyTorch class warnings
+   - GGML bf16 kernel skipping
+
+✅ DO MONITOR for:
+   - ERROR messages (actual problems)
+   - Failed API calls
+   - Memory creation failures
+
+Your Memorizer is working correctly! 🚀
+
+See WARNINGS.md for detailed explanation.
+================================================================================

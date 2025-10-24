@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "memorizer": {
+      "command": "python",
+      "args": [
+        "/REPLACE/WITH/YOUR/PATH/memorizer-v1/memorizer-python/mcp_server.py"
+      ],
+      "env": {
+        "MEMORIZER_DATA_DIR": "/REPLACE/WITH/YOUR/PATH/memorizer-v1/memorizer-python/data",
+        "MEMORIZER_CHROMA_DIR": "/REPLACE/WITH/YOUR/PATH/memorizer-v1/memorizer-python/data/chroma",
+        "MEMORIZER_MODELS_DIR": "/REPLACE/WITH/YOUR/PATH/memorizer-v1/memorizer-python/models",
+        "MEMORIZER_EMBEDDING_MODEL": "all-MiniLM-L6-v2",
+        "MEMORIZER_SIMILARITY_THRESHOLD": "0.7",
+        "MEMORIZER_SEARCH_LIMIT": "10"
+      }
+    }
+  }
+}
