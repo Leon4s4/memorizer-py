@@ -1,24 +1,53 @@
-__pycache__
-*.pyc
-*.pyo
-*.pyd
-.Python
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
 *.so
-*.egg
-*.egg-info
-dist
-build
-.pytest_cache
-.coverage
-.env
-.venv
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
 venv/
+env/
 ENV/
-data/
-*.log
-.DS_Store
-.vscode
-.idea
+
+# IDE
+.vscode/
+.idea/
 *.swp
 *.swo
 *~
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+!README.md
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Data and models (will be downloaded or mounted)
+data/
+.cache/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/

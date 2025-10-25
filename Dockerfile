@@ -55,22 +55,28 @@ USER memorizer
 ENV PATH=/home/memorizer/.local/bin:$PATH
 ENV SENTENCE_TRANSFORMERS_HOME=/app/models/sentence-transformers
 
-# Pre-download the embedding model (~90MB) and clean cache
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2', cache_folder='/app/models/sentence-transformers')" && \
+# Pre-download the embedding model (~90MB) - using cache mount for faster builds
+RUN --mount=type=cache,target=/root/.cache/huggingface \
+    python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2', cache_folder='/app/models/sentence-transformers')" && \
     find /app/models -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && \
     find /app/models -type f -name "*.pyc" -delete 2>/dev/null || true
 
 # Switch to root to download LLM model
 USER root
 
-# Download LLM model for air-gapped deployment (~600MB) and clean up wget
-RUN echo "Downloading LLM model for air-gapped deployment..." && \
-    wget -q --show-progress --progress=bar:force \
-    https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf \
-    -O /app/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf && \
+# Download LLM model for air-gapped deployment (~600MB) - using cache mount
+RUN --mount=type=cache,target=/root/.wget-cache \
+    if [ ! -f "/root/.wget-cache/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf" ]; then \
+        echo "Downloading LLM model for air-gapped deployment..."; \
+        wget -q --show-progress --progress=bar:force \
+        https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf \
+        -O /root/.wget-cache/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf; \
+    else \
+        echo "✅ Using cached LLM model"; \
+    fi && \
+    cp /root/.wget-cache/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf /app/models/ && \
     chown memorizer:memorizer /app/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf && \
-    rm -rf /root/.wget-hsts && \
-    echo "✅ LLM model downloaded and bundled in image"
+    echo "✅ LLM model ready"
 
 # Environment variables
 USER memorizer

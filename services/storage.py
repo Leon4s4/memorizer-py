@@ -89,10 +89,17 @@ class StorageService:
         metadata_embedding = self._embedding_service.generate_embedding(metadata_text)
 
         # Store in ChromaDB
-        memory_dict = memory.model_dump(exclude={'embedding', 'embedding_metadata', 'similarity', 'relationships'})
+        # Exclude 'content' since it can contain complex types (dicts) that ChromaDB doesn't support in metadata
+        memory_dict = memory.model_dump(exclude={'embedding', 'embedding_metadata', 'similarity', 'relationships', 'content'})
         memory_dict['created_at'] = memory.created_at.isoformat()
         memory_dict['updated_at'] = memory.updated_at.isoformat()
         memory_dict['id'] = str(memory.id)
+
+        # Convert tags list to comma-separated string for ChromaDB (doesn't support lists in metadata)
+        if memory_dict.get('tags'):
+            memory_dict['tags'] = ','.join(memory_dict['tags'])
+        else:
+            memory_dict['tags'] = ''
 
         # Add to full content collection
         self._memories_collection.add(
@@ -136,6 +143,14 @@ class StorageService:
             metadata['id'] = UUID(metadata['id'])
             metadata['created_at'] = datetime.fromisoformat(metadata['created_at'])
             metadata['updated_at'] = datetime.fromisoformat(metadata['updated_at'])
+
+            # Convert tags from comma-separated string back to list
+            if 'tags' in metadata and isinstance(metadata['tags'], str):
+                metadata['tags'] = [tag.strip() for tag in metadata['tags'].split(',') if tag.strip()]
+
+            # Reconstruct content field from text (since we don't store content in ChromaDB metadata)
+            if 'content' not in metadata and 'text' in metadata:
+                metadata['content'] = {"text": metadata['text']}
 
             memory = Memory(**metadata)
 
@@ -272,7 +287,9 @@ class StorageService:
             )
 
             if metadata and tags:
-                memory_tags = metadata.get('tags', [])
+                # Tags are stored as comma-separated string in ChromaDB
+                memory_tags_str = metadata.get('tags', '')
+                memory_tags = [tag.strip() for tag in memory_tags_str.split(',') if tag.strip()] if isinstance(memory_tags_str, str) else memory_tags_str
                 if any(tag in memory_tags for tag in tags):
                     avg_similarity += settings.tag_boost
 
@@ -301,6 +318,15 @@ class StorageService:
                 metadata['id'] = UUID(metadata['id'])
                 metadata['created_at'] = datetime.fromisoformat(metadata['created_at'])
                 metadata['updated_at'] = datetime.fromisoformat(metadata['updated_at'])
+
+                # Convert tags from comma-separated string back to list
+                if 'tags' in metadata and isinstance(metadata['tags'], str):
+                    metadata['tags'] = [tag.strip() for tag in metadata['tags'].split(',') if tag.strip()]
+
+                # Reconstruct content field from text (since we don't store content in ChromaDB metadata)
+                if 'content' not in metadata and 'text' in metadata:
+                    metadata['content'] = {"text": metadata['text']}
+
                 memory = Memory(**metadata)
                 memory.similarity = similarity
                 memories.append(memory)
@@ -332,6 +358,15 @@ class StorageService:
             metadata['id'] = UUID(metadata['id'])
             metadata['created_at'] = datetime.fromisoformat(metadata['created_at'])
             metadata['updated_at'] = datetime.fromisoformat(metadata['updated_at'])
+
+            # Convert tags from comma-separated string back to list
+            if 'tags' in metadata and isinstance(metadata['tags'], str):
+                metadata['tags'] = [tag.strip() for tag in metadata['tags'].split(',') if tag.strip()]
+
+            # Reconstruct content field from text (since we don't store content in ChromaDB metadata)
+            if 'content' not in metadata and 'text' in metadata:
+                metadata['content'] = {"text": metadata['text']}
+
             memories.append(Memory(**metadata))
 
         return memories
