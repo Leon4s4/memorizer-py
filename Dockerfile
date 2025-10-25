@@ -2,7 +2,7 @@
 # This version pre-downloads the LLM model during build for fully offline deployment
 # Size: ~2GB (vs ~800MB without LLM)
 
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -19,7 +19,9 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir --user -r requirements.txt && \
+    find /root/.local -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && \
+    find /root/.local -type f -name "*.pyc" -delete 2>/dev/null || true
 
 
 # Final stage
@@ -52,18 +54,21 @@ USER memorizer
 ENV PATH=/home/memorizer/.local/bin:$PATH
 ENV SENTENCE_TRANSFORMERS_HOME=/app/models/sentence-transformers
 
-# Pre-download the embedding model (~90MB)
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2', cache_folder='/app/models/sentence-transformers')"
+# Pre-download the embedding model (~90MB) and clean cache
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2', cache_folder='/app/models/sentence-transformers')" && \
+    find /app/models -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && \
+    find /app/models -type f -name "*.pyc" -delete 2>/dev/null || true
 
 # Switch to root to download LLM model
 USER root
 
-# Download LLM model for air-gapped deployment (~600MB)
+# Download LLM model for air-gapped deployment (~600MB) and clean up wget
 RUN echo "Downloading LLM model for air-gapped deployment..." && \
-    wget --progress=bar:force \
+    wget -q --show-progress --progress=bar:force \
     https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf \
     -O /app/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf && \
     chown memorizer:memorizer /app/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf && \
+    rm -rf /root/.wget-hsts && \
     echo "✅ LLM model downloaded and bundled in image"
 
 # Environment variables
