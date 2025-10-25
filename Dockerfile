@@ -86,7 +86,7 @@ ENV CHROMA_TELEMETRY_IMPL=none
 ENV PYTORCH_ENABLE_MPS_FALLBACK=1
 
 # Expose ports
-EXPOSE 8000 8501
+EXPOSE 8000 8501 8800
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
@@ -133,6 +133,11 @@ for i in {1..30}; do\n\
     sleep 1\n\
 done\n\
 \n\
+# Start MCP HTTP server in background\n\
+echo "Starting MCP HTTP server on port 8800..."\n\
+python mcp_http_server.py &\n\
+MCP_PID=$!\n\
+\n\
 # Start Streamlit\n\
 echo "Starting Streamlit UI on port 8501..."\n\
 streamlit run app.py --server.port=8501 --server.address=0.0.0.0 --server.headless=true &\n\
@@ -146,20 +151,21 @@ echo ""\n\
 echo "API:        http://localhost:8000"\n\
 echo "API Docs:   http://localhost:8000/docs"\n\
 echo "UI:         http://localhost:8501"\n\
+echo "MCP HTTP:   http://localhost:8800/mcp"\n\
 echo "Health:     http://localhost:8000/healthz"\n\
 echo ""\n\
 echo "Features:"\n\
 echo "  ✅ Semantic search (ChromaDB)"\n\
 echo "  ✅ Vector embeddings (all-MiniLM-L6-v2)"\n\
 echo "  ✅ Title generation (TinyLlama 1.1B)"\n\
-echo "  ✅ MCP server ready"\n\
+echo "  ✅ MCP HTTP server (stdio + HTTP)"\n\
 echo "  ✅ Fully air-gapped"\n\
 echo ""\n\
 echo "========================================"\n\
 echo ""\n\
 \n\
-# Wait for both processes\n\
-wait $API_PID $STREAMLIT_PID\n\
+# Wait for all processes\n\
+wait $API_PID $MCP_PID $STREAMLIT_PID\n\
 ' > /app/start.sh && chmod +x /app/start.sh
 
 USER memorizer
