@@ -220,48 +220,80 @@ with st.sidebar:
 # Helper function to display memory card matching Bootstrap style
 def display_memory_card(memory, show_similarity=False):
     """Display a memory card matching the original Bootstrap UI style."""
+    import html as html_module
 
-    # Use Streamlit components instead of raw HTML to avoid rendering issues
-    with st.container():
-        # Card styling
-        st.markdown('<div class="memory-card">', unsafe_allow_html=True)
+    # Extract preview text from text field or content dict
+    if memory.text:
+        preview_text = memory.text
+    elif isinstance(memory.content, dict) and 'text' in memory.content:
+        preview_text = memory.content['text']
+    else:
+        preview_text = str(memory.content)
 
-        # Title and type badge
-        col1, col2 = st.columns([4, 1])
-        with col1:
-            st.markdown(f'<h6 class="memory-card-title">{memory.title or "Untitled"}</h6>', unsafe_allow_html=True)
-        with col2:
-            st.markdown(f'<span class="badge badge-primary">{memory.type}</span>', unsafe_allow_html=True)
+    if len(preview_text) > 200:
+        preview_text = preview_text[:200] + "..."
 
-        # Preview text - use st.text to avoid HTML issues
-        preview_text = memory.text if memory.text else str(memory.content)
-        if len(preview_text) > 200:
-            preview_text = preview_text[:200] + "..."
-        st.caption(preview_text)
+    # Escape user content to prevent HTML injection (but NOT the structure tags)
+    preview_escaped = html_module.escape(preview_text)
+    title_escaped = html_module.escape(memory.title or "Untitled")
+    mem_type_escaped = html_module.escape(memory.type)
+    source_escaped = html_module.escape(memory.source)
 
-        # Tags
-        if memory.tags:
-            tags_html = " ".join([f'<span class="badge badge-secondary">{tag}</span>' for tag in memory.tags])
-            st.markdown(tags_html, unsafe_allow_html=True)
+    # Build tags HTML
+    tags_html = ""
+    if memory.tags:
+        tags_html = " ".join([f'<span class="badge badge-secondary">{html_module.escape(tag)}</span>' for tag in memory.tags])
 
-        # Source and confidence
-        col1, col2 = st.columns(2)
-        with col1:
-            st.caption(f"👤 {memory.source}")
-        with col2:
-            st.caption(f"📊 {memory.confidence:.0%}")
+    # Build similarity HTML
+    similarity_html = ""
+    if show_similarity and memory.similarity:
+        similarity_html = f'<div style="background-color: #d1ecf1; border: 1px solid #bee5eb; padding: 0.5rem; border-radius: 0.25rem; margin-bottom: 0.5rem; color: #0c5460;">Similarity: {memory.similarity:.0%}</div>'
 
-        # Timestamp
-        st.caption(f"🕐 {memory.created_at.strftime('%Y-%m-%d %H:%M')}")
+    # Build the entire card as HTML
+    card_html = """
+    <div class="memory-card">
+        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.75rem;">
+            <h6 class="memory-card-title" style="margin: 0; flex: 1;">{title}</h6>
+            <span class="badge badge-primary">{mem_type}</span>
+        </div>
 
-        # Similarity
-        if show_similarity and memory.similarity:
-            st.success(f"Similarity: {memory.similarity:.0%}")
+        <p class="memory-card-preview" style="color: #6c757d; font-size: 0.875rem; margin-bottom: 0.75rem;">
+            {preview}
+        </p>
 
-        # ID
-        st.caption(f"ID: `{memory.id}`")
+        <div style="margin-bottom: 0.75rem;">
+            {tags}
+        </div>
 
-        st.markdown('</div>', unsafe_allow_html=True)
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.875rem; color: #6c757d; margin-bottom: 0.5rem;">
+            <div>👤 {source}</div>
+            <div>📊 {confidence:.0%}</div>
+        </div>
+
+        <div style="font-size: 0.875rem; color: #6c757d; margin-bottom: 0.5rem;">
+            🕐 {timestamp}
+        </div>
+
+        {similarity}
+
+        <div style="font-size: 0.75rem; color: #6c757d; margin-bottom: 1rem;">
+            ID: <code style="background-color: #f8f9fa; padding: 0.125rem 0.25rem; border-radius: 0.25rem;">{mem_id}</code>
+        </div>
+    </div>
+    """.format(
+        title=title_escaped,
+        mem_type=mem_type_escaped,
+        preview=preview_escaped,
+        tags=tags_html,
+        source=source_escaped,
+        confidence=memory.confidence,
+        timestamp=memory.created_at.strftime('%Y-%m-%d %H:%M'),
+        similarity=similarity_html,
+        mem_id=memory.id
+    )
+
+    # Use st.html() for proper HTML rendering in Streamlit 1.40+
+    st.html(card_html)
 
     # Action buttons
     col1, col2, col3 = st.columns(3)
