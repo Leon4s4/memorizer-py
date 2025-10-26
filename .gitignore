@@ -59,3 +59,5 @@ Thumbs.db
 postgres-data/
 ollama-data/
 memorizer-data/
+
+card-creation.md
