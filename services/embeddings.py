@@ -22,27 +22,69 @@ class EmbeddingService:
         """Lazy load the embedding models."""
         if self._model_primary is None:
             logger.info(f"Loading primary embedding model: {settings.embedding_model_primary}")
-            # Try loading from local path first (air-gapped), fallback to downloading
-            model_path = settings.models_dir / "sentence-transformers" / settings.embedding_model_primary
+            # Try loading from local path first (air-gapped)
+            # Hugging Face cache format: models--{org}--{model}
+            cache_name = f"models--sentence-transformers--{settings.embedding_model_primary.split('/')[-1]}"
+            model_path = settings.models_dir / "sentence-transformers" / cache_name / "snapshots"
+
+            # Find the snapshot directory (should be only one)
+            loaded = False
             if model_path.exists():
-                logger.info(f"Loading from local path: {model_path}")
-                self._model_primary = SentenceTransformer(str(model_path))
-            else:
-                logger.info(f"Downloading model: {settings.embedding_model_primary}")
+                snapshots = list(model_path.iterdir())
+                if snapshots:
+                    snapshot_path = snapshots[0]
+                    logger.info(f"Loading from local cache: {snapshot_path}")
+                    self._model_primary = SentenceTransformer(str(snapshot_path))
+                    logger.info("Primary embedding model loaded successfully")
+                    loaded = True
+
+            # Fallback: try direct path
+            if not loaded:
+                direct_path = settings.models_dir / "sentence-transformers" / settings.embedding_model_primary
+                if direct_path.exists():
+                    logger.info(f"Loading from local path: {direct_path}")
+                    self._model_primary = SentenceTransformer(str(direct_path))
+                    logger.info("Primary embedding model loaded successfully")
+                    loaded = True
+
+            # Last resort: download (will fail in air-gapped)
+            if not loaded:
+                logger.warning(f"Model not found locally, attempting download: {settings.embedding_model_primary}")
                 self._model_primary = SentenceTransformer(settings.embedding_model_primary)
-            logger.info("Primary embedding model loaded successfully")
+                logger.info("Primary embedding model loaded successfully")
 
         if settings.use_dual_embeddings and self._model_secondary is None:
             logger.info(f"Loading secondary embedding model: {settings.embedding_model_secondary}")
-            # Try loading from local path first (air-gapped), fallback to downloading
-            model_path = settings.models_dir / "sentence-transformers" / settings.embedding_model_secondary
+            # Try loading from local path first (air-gapped)
+            # Hugging Face cache format: models--{org}--{model}
+            cache_name = f"models--sentence-transformers--{settings.embedding_model_secondary.split('/')[-1]}"
+            model_path = settings.models_dir / "sentence-transformers" / cache_name / "snapshots"
+
+            # Find the snapshot directory (should be only one)
+            loaded = False
             if model_path.exists():
-                logger.info(f"Loading from local path: {model_path}")
-                self._model_secondary = SentenceTransformer(str(model_path))
-            else:
-                logger.info(f"Downloading model: {settings.embedding_model_secondary}")
+                snapshots = list(model_path.iterdir())
+                if snapshots:
+                    snapshot_path = snapshots[0]
+                    logger.info(f"Loading from local cache: {snapshot_path}")
+                    self._model_secondary = SentenceTransformer(str(snapshot_path))
+                    logger.info("Secondary embedding model loaded successfully")
+                    loaded = True
+
+            # Fallback: try direct path
+            if not loaded:
+                direct_path = settings.models_dir / "sentence-transformers" / settings.embedding_model_secondary
+                if direct_path.exists():
+                    logger.info(f"Loading from local path: {direct_path}")
+                    self._model_secondary = SentenceTransformer(str(direct_path))
+                    logger.info("Secondary embedding model loaded successfully")
+                    loaded = True
+
+            # Last resort: download (will fail in air-gapped)
+            if not loaded:
+                logger.warning(f"Model not found locally, attempting download: {settings.embedding_model_secondary}")
                 self._model_secondary = SentenceTransformer(settings.embedding_model_secondary)
-            logger.info("Secondary embedding model loaded successfully")
+                logger.info("Secondary embedding model loaded successfully")
 
     def generate_embedding(self, text: str) -> list[float]:
         """
