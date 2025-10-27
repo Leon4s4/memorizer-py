@@ -97,7 +97,7 @@ async def list_tools() -> list[Tool]:
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "The text to search for similar memories. Use natural language queries to find relevant reference or how-to information."
+                        "description": "The text to search for similar memories. Use natural language queries that are close to the expected content. Include key terms and context from the user's question. For example, if the user asks 'what is my name', search for 'user name' or 'my name', not just 'name'."
                     },
                     "limit": {
                         "type": "integer",
@@ -108,7 +108,7 @@ async def list_tools() -> list[Tool]:
                     },
                     "minSimilarity": {
                         "type": "number",
-                        "description": "Minimum similarity threshold (0.0 to 1.0)",
+                        "description": "Minimum similarity threshold (0.0 to 1.0). Use 0.6-0.7 for general queries. Lower values (0.4-0.5) work better for short queries or when searching for specific facts. Higher values (0.8+) for very precise matches.",
                         "default": 0.7,
                         "minimum": 0.0,
                         "maximum": 1.0
@@ -281,50 +281,29 @@ async def handle_search(args: dict[str, Any]) -> list[TextContent]:
 
     logger.info(f"Search query: {query}, limit: {limit}, threshold: {min_similarity}, tags: {filter_tags}")
 
-    # Search memories
-    # Convert similarity threshold (0-1) to distance threshold for ChromaDB
+    # Search memories with user-specified threshold
+    # Storage service handles filtering and fallback
     memories = storage.search(
         query=query,
         limit=limit,
-        tags=filter_tags if filter_tags else None
+        tags=filter_tags if filter_tags else None,
+        threshold=min_similarity,
+        use_fallback=True
     )
 
-    # Filter by similarity threshold
-    filtered = [m for m in memories if m.similarity and (1 - m.similarity) >= min_similarity]
-
-    used_fallback = False
-    actual_threshold = min_similarity
-
-    # Fallback if no results
-    if not filtered and min_similarity > 0.0:
-        fallback_threshold = max(0.0, min_similarity - 0.1)
-        logger.info(f"No results at {min_similarity}, trying fallback at {fallback_threshold}")
-        filtered = [m for m in memories if m.similarity and (1 - m.similarity) >= fallback_threshold]
-
-        if filtered:
-            used_fallback = True
-            actual_threshold = fallback_threshold
-
-    if not filtered:
+    if not memories:
         return [TextContent(
             type="text",
             text="No memories found matching your query, even with a relaxed similarity threshold. Try using different search terms or lowering the similarity threshold further."
         )]
 
     # Format results
-    result_lines = []
-
-    if used_fallback:
-        result_lines.append(f"No results found at similarity threshold {min_similarity:.1f}, but found {len(filtered)} memories at relaxed threshold {actual_threshold:.1f}:")
-    else:
-        result_lines.append(f"Found {len(filtered)} memories:")
-
-    result_lines.append("")
+    result_lines = [f"Found {len(memories)} memories:", ""]
 
     # Collect related memory IDs
     related_ids = set()
 
-    for memory in filtered:
+    for memory in memories:
         result_lines.append(f"ID: {memory.id}")
         if memory.title:
             result_lines.append(f"Title: {memory.title}")
@@ -335,7 +314,7 @@ async def handle_search(args: dict[str, Any]) -> list[TextContent]:
         result_lines.append(f"Confidence: {memory.confidence:.2f}")
 
         if memory.similarity:
-            percent = 100 * (1 - memory.similarity)
+            percent = 100 * memory.similarity
             result_lines.append(f"Similarity: {percent:.1f}%")
 
         # List relationships

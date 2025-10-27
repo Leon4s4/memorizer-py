@@ -57,9 +57,27 @@ class StorageService:
 
     def _extract_text(self, content: dict) -> str:
         """Extract text content from JSON."""
-        # Simple text extraction - customize based on your content structure
+        # Extract the actual text from nested dict structures
         if isinstance(content, dict):
-            return json.dumps(content, indent=2)
+            # If it has a 'text' key, extract it recursively
+            if 'text' in content:
+                text_value = content['text']
+                # Handle nested JSON strings
+                if isinstance(text_value, str):
+                    try:
+                        # Try to parse as JSON and extract recursively
+                        parsed = json.loads(text_value)
+                        return self._extract_text(parsed)
+                    except (json.JSONDecodeError, TypeError):
+                        # Not JSON, return as-is
+                        return text_value
+                # Handle nested dicts
+                elif isinstance(text_value, dict):
+                    return self._extract_text(text_value)
+                else:
+                    return str(text_value)
+            # Fallback: join all values
+            return ' '.join(str(v) for v in content.values() if v)
         return str(content)
 
     def _create_metadata_text(self, memory: Memory) -> str:
@@ -233,7 +251,8 @@ class StorageService:
         query: str,
         limit: int = 10,
         tags: Optional[list[str]] = None,
-        use_fallback: bool = True
+        use_fallback: bool = True,
+        threshold: Optional[float] = None
     ) -> list[Memory]:
         """
         Search memories using semantic similarity.
@@ -243,6 +262,7 @@ class StorageService:
             limit: Maximum number of results
             tags: Optional tag filter
             use_fallback: Whether to use fallback threshold if no results
+            threshold: Optional similarity threshold (0.0-1.0). If None, uses config default.
 
         Returns:
             List of matching memories with similarity scores
@@ -317,14 +337,14 @@ class StorageService:
         final_scores.sort(key=lambda x: x[1], reverse=True)
 
         # Apply threshold
-        threshold = settings.similarity_threshold
-        filtered_scores = [s for s in final_scores if s[1] >= threshold]
+        similarity_threshold = threshold if threshold is not None else settings.similarity_threshold
+        filtered_scores = [s for s in final_scores if s[1] >= similarity_threshold]
 
         # Fallback if no results
         if not filtered_scores and use_fallback:
             logger.info("No results with standard threshold, trying fallback")
-            threshold = settings.fallback_threshold
-            filtered_scores = [s for s in final_scores if s[1] >= threshold]
+            fallback = settings.fallback_threshold if threshold is None else max(0.0, similarity_threshold - 0.1)
+            filtered_scores = [s for s in final_scores if s[1] >= fallback]
 
         # Limit results
         filtered_scores = filtered_scores[:limit]

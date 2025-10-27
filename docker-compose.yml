@@ -25,6 +25,8 @@ services:
       - MEMORIZER_ENABLE_BACKGROUND_JOBS=true
       - CHROMA_TELEMETRY_IMPL=none
       - PYTORCH_ENABLE_MPS_FALLBACK=1
+      - TRANSFORMERS_VERBOSITY=error
+      - TOKENIZERS_PARALLELISM=false
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
       interval: 30s
