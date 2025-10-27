@@ -55,15 +55,14 @@ USER memorizer
 ENV PATH=/home/memorizer/.local/bin:$PATH
 ENV SENTENCE_TRANSFORMERS_HOME=/app/models/sentence-transformers
 
-# Download embedding models during build (for air-gapped deployment)
+# Copy pre-bundled embedding models from repository (no download needed)
 # L6 model (~90MB) for fast embeddings, L12 model (~133MB) for high-quality embeddings
-RUN python3 -c "from sentence_transformers import SentenceTransformer; \
-    print('Downloading primary embedding model...'); \
-    model1 = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2', cache_folder='${SENTENCE_TRANSFORMERS_HOME}'); \
-    print('✅ Primary model downloaded'); \
-    print('Downloading secondary embedding model...'); \
-    model2 = SentenceTransformer('sentence-transformers/all-MiniLM-L12-v2', cache_folder='${SENTENCE_TRANSFORMERS_HOME}'); \
-    print('✅ Secondary model downloaded')" && \
+# Models are stored in Git LFS and copied during build for air-gapped deployment
+COPY --chown=memorizer:memorizer models/sentence-transformers /app/models/sentence-transformers
+
+RUN echo "Embedding models copied from repository..." && \
+    echo "✅ L6 model embedded" && \
+    echo "✅ L12 model embedded" && \
     echo "Models embedded in image at: ${SENTENCE_TRANSFORMERS_HOME}" && \
     ls -lh /app/models/sentence-transformers/ && \
     find /app/models -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && \
