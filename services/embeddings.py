@@ -30,22 +30,30 @@ class EmbeddingService:
             # Find the snapshot directory (should be only one)
             loaded = False
             if model_path.exists():
-                snapshots = list(model_path.iterdir())
+                # Filter out hidden files/dirs and only get actual snapshot directories
+                snapshots = [d for d in model_path.iterdir() if d.is_dir() and not d.name.startswith('.')]
                 if snapshots:
                     snapshot_path = snapshots[0]
-                    logger.info(f"Loading from local cache: {snapshot_path}")
-                    self._model_primary = SentenceTransformer(str(snapshot_path))
-                    logger.info("Primary embedding model loaded successfully")
-                    loaded = True
+                    logger.info(f"Loading primary model from local cache: {snapshot_path}")
+                    try:
+                        self._model_primary = SentenceTransformer(str(snapshot_path), local_files_only=True)
+                        logger.info("Primary embedding model loaded successfully")
+                        loaded = True
+                    except Exception as e:
+                        logger.error(f"Failed to load primary model from {snapshot_path}: {e}")
+                        # Continue to try direct_path fallback
 
             # Fallback: try direct path
             if not loaded:
                 direct_path = settings.models_dir / "sentence-transformers" / settings.embedding_model_primary
                 if direct_path.exists():
-                    logger.info(f"Loading from local path: {direct_path}")
-                    self._model_primary = SentenceTransformer(str(direct_path))
-                    logger.info("Primary embedding model loaded successfully")
-                    loaded = True
+                    logger.info(f"Loading primary model from direct path: {direct_path}")
+                    try:
+                        self._model_primary = SentenceTransformer(str(direct_path), local_files_only=True)
+                        logger.info("Primary embedding model loaded successfully")
+                        loaded = True
+                    except Exception as e:
+                        logger.error(f"Failed to load primary model from {direct_path}: {e}")
 
             # Fail if not found locally (air-gapped deployment)
             if not loaded:
@@ -67,22 +75,30 @@ class EmbeddingService:
             # Find the snapshot directory (should be only one)
             loaded = False
             if model_path.exists():
-                snapshots = list(model_path.iterdir())
+                # Filter out hidden files/dirs and only get actual snapshot directories
+                snapshots = [d for d in model_path.iterdir() if d.is_dir() and not d.name.startswith('.')]
                 if snapshots:
                     snapshot_path = snapshots[0]
-                    logger.info(f"Loading from local cache: {snapshot_path}")
-                    self._model_secondary = SentenceTransformer(str(snapshot_path))
-                    logger.info("Secondary embedding model loaded successfully")
-                    loaded = True
+                    logger.info(f"Loading secondary model from local cache: {snapshot_path}")
+                    try:
+                        self._model_secondary = SentenceTransformer(str(snapshot_path), local_files_only=True)
+                        logger.info("Secondary embedding model loaded successfully")
+                        loaded = True
+                    except Exception as e:
+                        logger.error(f"Failed to load secondary model from {snapshot_path}: {e}")
+                        # Continue to try direct_path fallback
 
             # Fallback: try direct path
             if not loaded:
                 direct_path = settings.models_dir / "sentence-transformers" / settings.embedding_model_secondary
                 if direct_path.exists():
-                    logger.info(f"Loading from local path: {direct_path}")
-                    self._model_secondary = SentenceTransformer(str(direct_path))
-                    logger.info("Secondary embedding model loaded successfully")
-                    loaded = True
+                    logger.info(f"Loading secondary model from direct path: {direct_path}")
+                    try:
+                        self._model_secondary = SentenceTransformer(str(direct_path), local_files_only=True)
+                        logger.info("Secondary embedding model loaded successfully")
+                        loaded = True
+                    except Exception as e:
+                        logger.error(f"Failed to load secondary model from {direct_path}: {e}")
 
             # Fail if not found locally (air-gapped deployment)
             if not loaded:
