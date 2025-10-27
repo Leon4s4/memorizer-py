@@ -47,11 +47,15 @@ class EmbeddingService:
                     logger.info("Primary embedding model loaded successfully")
                     loaded = True
 
-            # Last resort: download (will fail in air-gapped)
+            # Fail if not found locally (air-gapped deployment)
             if not loaded:
-                logger.warning(f"Model not found locally, attempting download: {settings.embedding_model_primary}")
-                self._model_primary = SentenceTransformer(settings.embedding_model_primary)
-                logger.info("Primary embedding model loaded successfully")
+                error_msg = (
+                    f"Primary embedding model '{settings.embedding_model_primary}' not found locally. "
+                    f"Expected at: {model_path} or {direct_path}. "
+                    f"For air-gapped deployment, ensure models are bundled in the Docker image."
+                )
+                logger.error(error_msg)
+                raise FileNotFoundError(error_msg)
 
         if settings.use_dual_embeddings and self._model_secondary is None:
             logger.info(f"Loading secondary embedding model: {settings.embedding_model_secondary}")
@@ -80,11 +84,15 @@ class EmbeddingService:
                     logger.info("Secondary embedding model loaded successfully")
                     loaded = True
 
-            # Last resort: download (will fail in air-gapped)
+            # Fail if not found locally (air-gapped deployment)
             if not loaded:
-                logger.warning(f"Model not found locally, attempting download: {settings.embedding_model_secondary}")
-                self._model_secondary = SentenceTransformer(settings.embedding_model_secondary)
-                logger.info("Secondary embedding model loaded successfully")
+                error_msg = (
+                    f"Secondary embedding model '{settings.embedding_model_secondary}' not found locally. "
+                    f"Expected at: {model_path} or {direct_path}. "
+                    f"For air-gapped deployment, ensure models are bundled in the Docker image."
+                )
+                logger.error(error_msg)
+                raise FileNotFoundError(error_msg)
 
     def generate_embedding(self, text: str) -> list[float]:
         """
