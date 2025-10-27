@@ -17,7 +17,9 @@ services:
       - "8800:8800"  # MCP HTTP Server
     volumes:
       - memorizer-data:/app/data
-      - ./models:/app/models  # Mount local models directory to avoid re-downloading
+      # NOTE: Models are copied from local repo during build (committed to git)
+      # This volume mount allows model updates without rebuilding the image
+      - ./models:/app/models
     environment:
       - MEMORIZER_ENVIRONMENT=production
       - MEMORIZER_ENABLE_BACKGROUND_JOBS=true

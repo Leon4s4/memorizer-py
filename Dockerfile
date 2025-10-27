@@ -55,9 +55,16 @@ USER memorizer
 ENV PATH=/home/memorizer/.local/bin:$PATH
 ENV SENTENCE_TRANSFORMERS_HOME=/app/models/sentence-transformers
 
-# Pre-download the embedding model (~90MB) - using cache mount for faster builds
-RUN --mount=type=cache,target=/root/.cache/huggingface \
-    python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2', cache_folder='/app/models/sentence-transformers')" && \
+# Copy pre-downloaded embedding models from local repo (no download needed during build)
+# L6 model (~90MB) for fast embeddings, L12 model (~133MB) for high-quality embeddings
+# Models are committed to the repo to avoid downloading on every build
+COPY --chown=memorizer:memorizer models/sentence-transformers /app/models/sentence-transformers
+
+RUN echo "Embedding models copied from local repo..." && \
+    echo "✅ L6 model embedded" && \
+    echo "✅ L12 model embedded" && \
+    echo "Models embedded in image at: ${SENTENCE_TRANSFORMERS_HOME}" && \
+    ls -lh /app/models/sentence-transformers/ && \
     find /app/models -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && \
     find /app/models -type f -name "*.pyc" -delete 2>/dev/null || true
 

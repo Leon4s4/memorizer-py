@@ -1,4 +1,4 @@
-"""Embedding service using sentence-transformers."""
+"""Embedding service using sentence-transformers with dual-embedding support."""
 import logging
 from typing import Optional
 from sentence_transformers import SentenceTransformer
@@ -8,23 +8,45 @@ logger = logging.getLogger(__name__)
 
 
 class EmbeddingService:
-    """Service for generating embeddings using sentence-transformers."""
+    """Service for generating embeddings using sentence-transformers with dual-embedding support."""
 
     def __init__(self):
         """Initialize the embedding service."""
-        self._model: Optional[SentenceTransformer] = None
-        logger.info(f"Embedding service initialized (model will load on first use)")
+        self._model_primary: Optional[SentenceTransformer] = None
+        self._model_secondary: Optional[SentenceTransformer] = None
+        logger.info(f"Embedding service initialized (models will load on first use)")
+        if settings.use_dual_embeddings:
+            logger.info(f"Dual-embedding mode enabled: {settings.embedding_model_primary} + {settings.embedding_model_secondary}")
 
-    def _load_model(self):
-        """Lazy load the embedding model."""
-        if self._model is None:
-            logger.info(f"Loading embedding model: {settings.embedding_model}")
-            self._model = SentenceTransformer(settings.embedding_model)
-            logger.info("Embedding model loaded successfully")
+    def _load_models(self):
+        """Lazy load the embedding models."""
+        if self._model_primary is None:
+            logger.info(f"Loading primary embedding model: {settings.embedding_model_primary}")
+            # Try loading from local path first (air-gapped), fallback to downloading
+            model_path = settings.models_dir / "sentence-transformers" / settings.embedding_model_primary
+            if model_path.exists():
+                logger.info(f"Loading from local path: {model_path}")
+                self._model_primary = SentenceTransformer(str(model_path))
+            else:
+                logger.info(f"Downloading model: {settings.embedding_model_primary}")
+                self._model_primary = SentenceTransformer(settings.embedding_model_primary)
+            logger.info("Primary embedding model loaded successfully")
+
+        if settings.use_dual_embeddings and self._model_secondary is None:
+            logger.info(f"Loading secondary embedding model: {settings.embedding_model_secondary}")
+            # Try loading from local path first (air-gapped), fallback to downloading
+            model_path = settings.models_dir / "sentence-transformers" / settings.embedding_model_secondary
+            if model_path.exists():
+                logger.info(f"Loading from local path: {model_path}")
+                self._model_secondary = SentenceTransformer(str(model_path))
+            else:
+                logger.info(f"Downloading model: {settings.embedding_model_secondary}")
+                self._model_secondary = SentenceTransformer(settings.embedding_model_secondary)
+            logger.info("Secondary embedding model loaded successfully")
 
     def generate_embedding(self, text: str) -> list[float]:
         """
-        Generate an embedding vector for the given text.
+        Generate an embedding vector for the given text using primary model.
 
         Args:
             text: Input text to embed
@@ -32,23 +54,54 @@ class EmbeddingService:
         Returns:
             List of float values representing the embedding vector
         """
-        self._load_model()
+        self._load_models()
 
         if not text or not text.strip():
             logger.warning("Empty text provided for embedding")
             return [0.0] * settings.embedding_dimension
 
         try:
-            # Generate embedding
-            embedding = self._model.encode(text, convert_to_numpy=True)
+            # Generate embedding using primary model
+            embedding = self._model_primary.encode(text, convert_to_numpy=True)
             return embedding.tolist()
         except Exception as e:
             logger.error(f"Error generating embedding: {e}")
             raise
 
+    def generate_dual_embeddings(self, text: str) -> tuple[list[float], Optional[list[float]]]:
+        """
+        Generate both primary and secondary embeddings for the given text.
+
+        Args:
+            text: Input text to embed
+
+        Returns:
+            Tuple of (primary_embedding, secondary_embedding)
+        """
+        self._load_models()
+
+        if not text or not text.strip():
+            logger.warning("Empty text provided for embedding")
+            zero_vec = [0.0] * settings.embedding_dimension
+            return (zero_vec, zero_vec if settings.use_dual_embeddings else None)
+
+        try:
+            # Generate primary embedding
+            primary_embedding = self._model_primary.encode(text, convert_to_numpy=True).tolist()
+
+            # Generate secondary embedding if dual embeddings are enabled
+            secondary_embedding = None
+            if settings.use_dual_embeddings:
+                secondary_embedding = self._model_secondary.encode(text, convert_to_numpy=True).tolist()
+
+            return (primary_embedding, secondary_embedding)
+        except Exception as e:
+            logger.error(f"Error generating dual embeddings: {e}")
+            raise
+
     def generate_embeddings(self, texts: list[str]) -> list[list[float]]:
         """
-        Generate embeddings for multiple texts (batch processing).
+        Generate embeddings for multiple texts (batch processing) using primary model.
 
         Args:
             texts: List of input texts to embed
@@ -56,17 +109,45 @@ class EmbeddingService:
         Returns:
             List of embedding vectors
         """
-        self._load_model()
+        self._load_models()
 
         if not texts:
             return []
 
         try:
-            # Batch encode for efficiency
-            embeddings = self._model.encode(texts, convert_to_numpy=True)
+            # Batch encode for efficiency using primary model
+            embeddings = self._model_primary.encode(texts, convert_to_numpy=True)
             return embeddings.tolist()
         except Exception as e:
             logger.error(f"Error generating batch embeddings: {e}")
+            raise
+
+    def generate_batch_dual_embeddings(self, texts: list[str]) -> tuple[list[list[float]], Optional[list[list[float]]]]:
+        """
+        Generate both primary and secondary embeddings for multiple texts (batch processing).
+
+        Args:
+            texts: List of input texts to embed
+
+        Returns:
+            Tuple of (primary_embeddings, secondary_embeddings)
+        """
+        self._load_models()
+
+        if not texts:
+            return ([], [] if settings.use_dual_embeddings else None)
+
+        try:
+            # Batch encode for efficiency
+            primary_embeddings = self._model_primary.encode(texts, convert_to_numpy=True).tolist()
+
+            secondary_embeddings = None
+            if settings.use_dual_embeddings:
+                secondary_embeddings = self._model_secondary.encode(texts, convert_to_numpy=True).tolist()
+
+            return (primary_embeddings, secondary_embeddings)
+        except Exception as e:
+            logger.error(f"Error generating batch dual embeddings: {e}")
             raise
 
     @property

@@ -29,15 +29,23 @@ class StorageService:
             )
         )
 
-        # Get or create collections
+        # Get or create collections with dual embeddings
+        # Primary collection: L6 model (fast) for full content
         self._memories_collection = self._client.get_or_create_collection(
             name="memories",
-            metadata={"description": "Memory storage with full content embeddings"}
+            metadata={
+                "description": "Memory storage with L6 (fast) embeddings",
+                "model": settings.embedding_model_primary
+            }
         )
 
+        # Secondary collection: L12 model (high-quality) for content
         self._metadata_collection = self._client.get_or_create_collection(
             name="memories_metadata",
-            metadata={"description": "Memory storage with metadata-only embeddings"}
+            metadata={
+                "description": "Memory storage with L12 (quality) embeddings",
+                "model": settings.embedding_model_secondary if settings.use_dual_embeddings else settings.embedding_model_primary
+            }
         )
 
         # In-memory storage for relationships (could be persisted to JSON file)
@@ -81,12 +89,12 @@ class StorageService:
         text_content = self._extract_text(memory.content)
         memory.text = text_content
 
-        # Generate full content embedding
-        full_embedding = self._embedding_service.generate_embedding(text_content)
-
-        # Generate metadata embedding
-        metadata_text = self._create_metadata_text(memory)
-        metadata_embedding = self._embedding_service.generate_embedding(metadata_text)
+        # Generate dual embeddings for full content
+        if settings.use_dual_embeddings:
+            primary_embedding, secondary_embedding = self._embedding_service.generate_dual_embeddings(text_content)
+        else:
+            primary_embedding = self._embedding_service.generate_embedding(text_content)
+            secondary_embedding = primary_embedding
 
         # Store in ChromaDB
         # Exclude 'content' since it can contain complex types (dicts) that ChromaDB doesn't support in metadata
@@ -101,20 +109,20 @@ class StorageService:
         else:
             memory_dict['tags'] = ''
 
-        # Add to full content collection
+        # Add to primary collection (L6 - fast embeddings)
         self._memories_collection.add(
             ids=[str(memory.id)],
-            embeddings=[full_embedding],
+            embeddings=[primary_embedding],
             metadatas=[memory_dict],
             documents=[text_content]
         )
 
-        # Add to metadata collection
+        # Add to secondary collection (L12 - quality embeddings)
         self._metadata_collection.add(
             ids=[str(memory.id)],
-            embeddings=[metadata_embedding],
+            embeddings=[secondary_embedding],
             metadatas=[memory_dict],
-            documents=[metadata_text]
+            documents=[text_content]  # Using same content for both collections
         )
 
         logger.info(f"Memory created successfully: {memory.id}")
@@ -241,48 +249,58 @@ class StorageService:
         """
         logger.info(f"Searching memories: query='{query}', limit={limit}, tags={tags}")
 
-        # Generate query embedding
-        query_embedding = self._embedding_service.generate_embedding(query)
+        # Generate dual query embeddings
+        if settings.use_dual_embeddings:
+            query_embedding_primary, query_embedding_secondary = self._embedding_service.generate_dual_embeddings(query)
+        else:
+            query_embedding_primary = self._embedding_service.generate_embedding(query)
+            query_embedding_secondary = query_embedding_primary
 
-        # Search in both collections
-        full_results = self._memories_collection.query(
-            query_embeddings=[query_embedding],
+        # Search in both collections with appropriate embeddings
+        # Primary collection uses L6 (fast) embeddings
+        primary_results = self._memories_collection.query(
+            query_embeddings=[query_embedding_primary],
             n_results=limit * 2,  # Get more results to filter
             include=["metadatas", "documents", "distances"]
         )
 
-        metadata_results = self._metadata_collection.query(
-            query_embeddings=[query_embedding],
+        # Secondary collection uses L12 (quality) embeddings
+        secondary_results = self._metadata_collection.query(
+            query_embeddings=[query_embedding_secondary],
             n_results=limit * 2,
             include=["metadatas", "documents", "distances"]
         )
 
-        # Combine and score results
+        # Combine and score results with weighted dual embeddings
         combined_scores = {}
 
-        # Process full content results
-        for idx, memory_id in enumerate(full_results['ids'][0]):
+        # Process primary (L6) results
+        for idx, memory_id in enumerate(primary_results['ids'][0]):
             # Convert distance to similarity (1 - distance for L2)
-            similarity = 1.0 - full_results['distances'][0][idx]
-            combined_scores[memory_id] = {'full': similarity, 'metadata': 0.0}
+            similarity = 1.0 - primary_results['distances'][0][idx]
+            combined_scores[memory_id] = {'primary': similarity, 'secondary': 0.0}
 
-        # Process metadata results
-        for idx, memory_id in enumerate(metadata_results['ids'][0]):
-            similarity = 1.0 - metadata_results['distances'][0][idx]
+        # Process secondary (L12) results
+        for idx, memory_id in enumerate(secondary_results['ids'][0]):
+            similarity = 1.0 - secondary_results['distances'][0][idx]
             if memory_id in combined_scores:
-                combined_scores[memory_id]['metadata'] = similarity
+                combined_scores[memory_id]['secondary'] = similarity
             else:
-                combined_scores[memory_id] = {'full': 0.0, 'metadata': similarity}
+                combined_scores[memory_id] = {'primary': 0.0, 'secondary': similarity}
 
-        # Calculate final scores (average of both)
+        # Calculate final scores using weighted combination
         final_scores = []
         for memory_id, scores in combined_scores.items():
-            avg_similarity = (scores['full'] + scores['metadata']) / 2.0
+            # Weighted average: 40% L6 (fast) + 60% L12 (quality)
+            weighted_similarity = (
+                scores['primary'] * settings.embedding_weight_primary +
+                scores['secondary'] * settings.embedding_weight_secondary
+            )
 
             # Tag boosting
             metadata = next(
-                (m for i, m in enumerate(full_results['metadatas'][0])
-                 if full_results['ids'][0][i] == memory_id),
+                (m for i, m in enumerate(primary_results['metadatas'][0])
+                 if primary_results['ids'][0][i] == memory_id),
                 None
             )
 
@@ -291,9 +309,9 @@ class StorageService:
                 memory_tags_str = metadata.get('tags', '')
                 memory_tags = [tag.strip() for tag in memory_tags_str.split(',') if tag.strip()] if isinstance(memory_tags_str, str) else memory_tags_str
                 if any(tag in memory_tags for tag in tags):
-                    avg_similarity += settings.tag_boost
+                    weighted_similarity += settings.tag_boost
 
-            final_scores.append((memory_id, avg_similarity, metadata))
+            final_scores.append((memory_id, weighted_similarity, metadata))
 
         # Sort by similarity
         final_scores.sort(key=lambda x: x[1], reverse=True)

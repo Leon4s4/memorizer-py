@@ -27,7 +27,7 @@ share/python-wheels/
 
 # Data directories
 data/
-models/
+# models/  # Commented out - we now commit models to avoid downloading on every build
 *.db
 *.sqlite
 

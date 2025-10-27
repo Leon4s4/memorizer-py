@@ -22,9 +22,15 @@ class Settings(BaseSettings):
     chroma_dir: Path = Path("./data/chroma")
     models_dir: Path = Path("./models")
 
-    # Embeddings
-    embedding_model: str = "all-MiniLM-L6-v2"
+    # Embeddings (Dual-embedding system for better accuracy)
+    embedding_model_primary: str = "all-MiniLM-L6-v2"  # Fast, 384D
+    embedding_model_secondary: str = "all-MiniLM-L12-v2"  # High-quality, 384D
+    embedding_model: str = "all-MiniLM-L6-v2"  # Backward compatibility
     embedding_dimension: int = 384
+    embedding_dimension_secondary: int = 384
+    use_dual_embeddings: bool = True
+    embedding_weight_primary: float = 0.4  # Weight for L6 embeddings
+    embedding_weight_secondary: float = 0.6  # Weight for L12 embeddings
 
     # LLM
     llm_model_path: str = "./models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"

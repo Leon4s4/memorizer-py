@@ -1,167 +1,199 @@
-# Memorizer - Self-Contained Memory System
+# Memorizer - Self-Contained Memory System with MCP Support
 
 **Air-gapped ready!** Everything bundled in a single Docker container with NO internet required at runtime.
 
-## 🔥 Key Feature: MCP Server
-
-**MCP (Model Context Protocol) server** lets AI assistants like Claude Desktop:
-- 💾 Store persistent memories
-- 🔍 Search semantically using natural language
-- 🔗 Create knowledge graphs between memories
-- 🧠 Build persistent knowledge that grows over time
-
-**➡️ [MCP Setup Guide](MCP_SETUP.md)**
-
 ## Features
 
-- 🎯 **MCP Server** - Full Model Context Protocol support
-- 🧠 **Semantic Search** - Vector-based similarity search
-- 📦 **Self-Contained** - Single Docker container
-- 🔌 **Air-Gapped Ready** - All models bundled (~2GB)
-- 🎨 **Web UI** - Streamlit interface
-- 🚀 **REST API** - FastAPI with docs
-- 🤖 **Auto Titles** - LLM-powered title generation
-- 🔗 **Relationships** - Link memories together
+- 🎯 **MCP Server** - Full Model Context Protocol support for AI assistants
+- 🧠 **Dual Embeddings** - L6 + L12 models for superior search accuracy
+- 📦 **Self-Contained** - Single Docker container with all models
+- 🔌 **Air-Gapped Ready** - All models embedded (~879MB)
+- 🎨 **Web UI** - Streamlit interface with statistics and tools
+- 🚀 **REST API** - FastAPI with OpenAPI docs
+- 🤖 **Auto Titles** - LLM-powered title generation (TinyLlama 1.1B)
+- 🔗 **Relationships** - Link memories together with typed relationships
+- 🔧 **Maintenance Tools** - Database health checks and auto-fix
 
 ## Requirements
 
-- Docker 20.10+
+- Docker 20.10+ and Docker Compose
 - 4GB RAM minimum
 - 5GB disk space
 
-## Quick Start
+## Quick Start with Docker
 
-### 1. Build (downloads all models)
+### 1. Clone and Build
 
 ```bash
-cd memorizer-python
-docker build -t memorizer:latest .
+git clone <repository>
+cd memorizer-py
+docker-compose build
 ```
 
 This bundles:
-- Embedding model (~90MB)
-- LLM model (~600MB)
+- Dual embedding models: L6 (~90MB) + L12 (~133MB)
+- LLM model: TinyLlama (~600MB)
 - All dependencies
 
-### 2. Run (no internet needed!)
+### 2. Run
 
 ```bash
-docker run -d \
-  -p 8000:8000 \
-  -p 8501:8501 \
-  -v memorizer-data:/app/data \
-  --name memorizer \
-  memorizer:latest
+docker-compose up -d
 ```
 
 ### 3. Access
 
 - **Web UI:** http://localhost:8501
-- **API:** http://localhost:8000
-- **API Docs:** http://localhost:8000/docs
+- **API:** http://localhost:9000
+- **API Docs:** http://localhost:9000/docs
+- **MCP HTTP:** http://localhost:8800
 
-## MCP Setup (IMPORTANT!)
+## MCP (Model Context Protocol) Setup
 
-### Quick Setup for Claude Desktop (stdio mode)
+Connect Memorizer to AI assistants like Claude Desktop, Claude Code, or GitHub Copilot for persistent memory management.
 
-1. **Configure Claude Desktop** - Edit config file:
-   - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+### Available MCP Tools
 
-2. **Add this configuration:**
+- `store` - Store new memories with optional relationships
+- `search` - Semantic search with dual embeddings
+- `get` - Retrieve specific memory by ID
+- `getMany` - Fetch multiple memories
+- `delete` - Remove memories
+- `createRelationship` - Link memories together
+
+### Claude Desktop Configuration
+
+**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 
 ```json
 {
   "mcpServers": {
     "memorizer": {
-      "command": "python",
-      "args": ["/FULL/PATH/TO/memorizer-v1/memorizer-python/mcp_server.py"],
-      "env": {
-        "MEMORIZER_DATA_DIR": "/FULL/PATH/TO/memorizer-v1/memorizer-python/data",
-        "MEMORIZER_CHROMA_DIR": "/FULL/PATH/TO/memorizer-v1/memorizer-python/data/chroma",
-        "MEMORIZER_MODELS_DIR": "/FULL/PATH/TO/memorizer-v1/memorizer-python/models"
-      }
+      "command": "curl",
+      "args": [
+        "-N",
+        "-H",
+        "Accept: text/event-stream",
+        "http://localhost:8800/sse"
+      ]
     }
   }
 }
 ```
 
-**Helper:** Run `./get_full_path.sh` to generate exact paths for your system.
+**Windows:** `%APPDATA%\Claude\claude_desktop_config.json` (use same config)
 
-3. **Restart Claude Desktop**
+### VS Code (Claude Code) Configuration
 
-4. **Test:** Ask Claude to "Store a test memory"
+**macOS:** `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
 
-### Quick Setup for VS Code (HTTP mode with Docker)
+**Windows:** `%APPDATA%\Code\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`
 
-1. **Start Memorizer:**
-```bash
-docker-compose up -d
-```
-
-2. **Create `.vscode/settings.json` in your workspace:**
 ```json
 {
-  "mcp.servers": {
+  "mcpServers": {
     "memorizer": {
-      "url": "http://localhost:8000",
-      "type": "http"
+      "command": "curl",
+      "args": [
+        "-N",
+        "-H",
+        "Accept: text/event-stream",
+        "http://localhost:8800/sse"
+      ]
     }
   }
 }
 ```
 
-3. **Reload VS Code** and test the MCP connection
+### GitHub Copilot Configuration
 
-### Available MCP Tools
+**macOS:** `~/Library/Application Support/Code - Insiders/User/mcp.json` or `~/Library/Application Support/Code/User/mcp.json`
 
-- `store` - Store new memories
-- `search` - Semantic search
-- `get` - Retrieve specific memory
-- `get_many` - Fetch multiple memories
-- `delete` - Remove memories
-- `create_relationship` - Link memories
+**Windows:** `%APPDATA%\Code\User\mcp.json`
 
-**Full guide:** [MCP_SETUP.md](MCP_SETUP.md)
-
-## Air-Gapped Deployment
-
-Deploy to completely offline environments:
-
-```bash
-# 1. Build on internet-connected machine
-docker build -t memorizer:latest .
-
-# 2. Save to file
-docker save memorizer:latest | gzip > memorizer.tar.gz
-
-# 3. Transfer to air-gapped machine (USB, secure transfer, etc.)
-
-# 4. Load and run (NO internet needed!)
-docker load < memorizer.tar.gz
-docker run -d -p 8000:8000 -p 8501:8501 -v memorizer-data:/app/data memorizer:latest
+```json
+{
+  "memorizer-python": {
+    "url": "http://localhost:8000",
+    "type": "http"
+  }
+}
 ```
 
-**Everything included:**
-- ✅ Embedding model (all-MiniLM-L6-v2)
-- ✅ LLM model (TinyLlama 1.1B)
-- ✅ All Python dependencies
-- ✅ ChromaDB database
+### System Prompt for AI Agents
+
+Add this to your `AGENT.md`, Cursor Rules, or AI agent configuration for better integration:
+
+```markdown
+You have access to a long-term memory system via the Model Context Protocol (MCP) at the endpoint **memorizer**. Use the following tools:
+
+- **store**: Store a new memory. Parameters: `type`, `content` (markdown), `source`, `tags`, `confidence`, `relatedTo` (optional, memory ID), `relationshipType` (optional).
+- **search**: Search for similar memories. Parameters: `query`, `limit`, `minSimilarity`, `filterTags`.
+- **get**: Retrieve a memory by ID. Parameter: `id`.
+- **getMany**: Retrieve multiple memories by their IDs. Parameter: `ids` (list of IDs).
+- **delete**: Delete a memory by ID. Parameter: `id`.
+- **createRelationship**: Create a relationship between two memories. Parameters: `fromId`, `toId`, `type`.
+
+Use these tools to remember, recall, relate, and manage information as needed to assist the user.
+```
+
+## Local Development (Without Docker)
+
+### Prerequisites
+
+- Python 3.11+
+- pip
+
+### Quick Start
+
+```bash
+# Run the setup script
+./run-local.sh
+```
+
+This will:
+1. Create virtual environment
+2. Install dependencies
+3. Start API server (port 8000)
+4. Start Streamlit UI (port 8501)
+
+### Manual Setup
+
+```bash
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Start API server
+uvicorn api:app --reload --host 0.0.0.0 --port 8000 &
+
+# Start Streamlit UI
+streamlit run app.py --server.port 8501
+```
 
 ## Usage
 
-### Web UI
+### Web UI Features
 
-1. **Search:** Enter query, filter by tags, view results with scores
-2. **Add Memory:** Fill form (type, source, content, tags)
-3. **Statistics:** View total memories, tags, relationships
-4. **Settings:** View config, trigger title generation
+1. **All Memories** - Browse, search, and filter memories
+2. **Create Memory** - Add new memories with rich content
+3. **Statistics** - View memory counts, tags, and performance metrics
+4. **Tools**:
+   - Title Generation - Auto-generate titles using LLM
+   - Dual Embedding - Use both L6 and L12 models for better accuracy
+   - Performance Analytics - Track tool usage and quality metrics
+   - Memory Maintenance - Database health checks with auto-fix
+5. **MCP Config** - Setup instructions for all AI assistants
+6. **System Config** - View system settings
 
-### REST API
+### REST API Examples
 
 **Create memory:**
 ```bash
-curl -X POST "http://localhost:8000/api/memories" \
+curl -X POST "http://localhost:9000/api/memories" \
   -H "Content-Type: application/json" \
   -d '{
     "type": "note",
@@ -171,58 +203,85 @@ curl -X POST "http://localhost:8000/api/memories" \
   }'
 ```
 
-**Search:**
+**Search memories:**
 ```bash
-curl -X POST "http://localhost:8000/api/search" \
+curl -X POST "http://localhost:9000/api/search" \
   -H "Content-Type: application/json" \
   -d '{"query": "test memory", "limit": 10}'
 ```
 
-**Full docs:** http://localhost:8000/docs
+**Full API documentation:** http://localhost:9000/docs
+
+## Dual Embedding System
+
+Memorizer uses two embedding models in parallel for superior search accuracy:
+
+- **L6 Model** (all-MiniLM-L6-v2): Fast, 384D embeddings - 40% weight
+- **L12 Model** (all-MiniLM-L12-v2): High quality, 384D embeddings - 60% weight
+
+Results are combined using weighted scoring for optimal relevance.
+
+## Air-Gapped Deployment
+
+Deploy to completely offline environments:
+
+```bash
+# 1. Build on internet-connected machine
+docker-compose build
+
+# 2. Save image to file
+docker save memorizer:latest | gzip > memorizer.tar.gz
+
+# 3. Transfer to air-gapped machine (USB, secure transfer, etc.)
+
+# 4. Load and run (NO internet needed!)
+docker load < memorizer.tar.gz
+docker-compose up -d
+```
+
+**Everything included:**
+- ✅ Dual embedding models (L6 + L12)
+- ✅ LLM model (TinyLlama 1.1B)
+- ✅ All Python dependencies
+- ✅ ChromaDB database
 
 ## Configuration
 
-Copy `.env.example` to `.env` to customize:
+Environment variables (all prefixed with `MEMORIZER_`):
 
-```bash
-cp .env.example .env
-```
+**Models:**
+- `EMBEDDING_MODEL_PRIMARY` - L6 model (default: all-MiniLM-L6-v2)
+- `EMBEDDING_MODEL_SECONDARY` - L12 model (default: all-MiniLM-L12-v2)
+- `USE_DUAL_EMBEDDINGS` - Enable dual embeddings (default: true)
+- `EMBEDDING_WEIGHT_PRIMARY` - L6 weight (default: 0.4)
+- `EMBEDDING_WEIGHT_SECONDARY` - L12 weight (default: 0.6)
+- `LLM_MODEL_PATH` - Path to GGUF model file
 
-Key settings:
-- `MEMORIZER_SIMILARITY_THRESHOLD` - Min similarity for search (0.7)
-- `MEMORIZER_SEARCH_LIMIT` - Default result limit (10)
-- `MEMORIZER_ENABLE_BACKGROUND_JOBS` - Auto title generation (true)
+**Search:**
+- `SIMILARITY_THRESHOLD` - Min similarity for search (default: 0.7)
+- `FALLBACK_THRESHOLD` - Fallback threshold (default: 0.6)
+- `SEARCH_LIMIT` - Default result limit (default: 10)
 
-## Troubleshooting
+**Paths:**
+- `DATA_DIR` - Base data directory (default: ./data)
+- `CHROMA_DIR` - ChromaDB path (default: ./data/chroma)
+- `MODELS_DIR` - Model storage (default: ./models)
 
-### Startup Warnings (Harmless!)
+**Jobs:**
+- `ENABLE_BACKGROUND_JOBS` - Auto title generation (default: true)
 
-You'll see warnings like:
-```
-Failed to send telemetry event...
-ggml_metal_init: skipping kernel...
-```
+See `.env.example` for complete configuration options.
 
-**These are normal!** They don't affect functionality.
+## Memory Relationships
 
-**To suppress:** Copy `.env.example` to `.env` (includes suppression settings)
+Link memories together with typed relationships:
 
-**Full explanation:** [WARNINGS_QUICK_FIX.txt](WARNINGS_QUICK_FIX.txt)
-
-### Common Issues
-
-**Port already in use:**
-```bash
-docker run -d -p 9000:8000 -p 9501:8501 memorizer:latest
-```
-
-**Out of memory:**
-- Increase Docker memory limit
-- Or use a smaller LLM model
-
-**LLM not working:**
-- Check logs: `docker logs memorizer`
-- Verify model file exists in container
+- `related-to` - General relationship
+- `example-of` - Link examples to concepts
+- `explains` - Link explanations to topics
+- `contradicts` - Conflicting information
+- `depends-on` - Dependencies
+- `supersedes` - Newer version replaces older
 
 ## Data Backup
 
@@ -238,17 +297,88 @@ docker run --rm -v memorizer-data:/data -v $(pwd):/backup \
   alpine tar xzf /backup/memorizer-backup.tar.gz -C /
 ```
 
+## Troubleshooting
+
+### Startup Warnings
+
+You may see harmless warnings like:
+- ChromaDB telemetry failures
+- PyTorch Metal warnings
+- GGML bf16 notices
+
+These don't affect functionality. To suppress, copy `.env.example` to `.env`.
+
+### Common Issues
+
+**Port already in use:**
+Edit `docker-compose.yml` to change port mappings.
+
+**Out of memory:**
+Increase Docker memory limit to 4GB or more.
+
+**MCP not connecting:**
+1. Ensure container is running: `docker ps`
+2. Check MCP server logs: `docker logs memorizer`
+3. Test MCP endpoint: `curl http://localhost:8800/mcp/tools`
+4. Restart your AI assistant after config changes
+
+### Model Files
+
+Models are embedded in the Docker image by default. If you want to use local models:
+
+1. Uncomment the volume mount in `docker-compose.yml`:
+   ```yaml
+   - ./models:/app/models
+   ```
+
+2. Download models locally:
+   ```bash
+   python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2', cache_folder='./models/sentence-transformers')"
+   python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L12-v2', cache_folder='./models/sentence-transformers')"
+   ```
+
 ## Architecture
 
-**Single Container:**
-- ChromaDB (embedded vector database)
-- sentence-transformers (embeddings)
-- llama-cpp-python + TinyLlama (LLM)
-- FastAPI (REST API)
-- Streamlit (Web UI)
+**Components:**
+- **ChromaDB** - Embedded vector database with dual collections
+- **Sentence Transformers** - Dual embedding generation (L6 + L12)
+- **Llama.cpp + TinyLlama** - Local LLM for title generation
+- **FastAPI** - REST API with background jobs
+- **Streamlit** - Interactive web UI
+- **MCP HTTP Server** - Model Context Protocol for AI integration
 
-**Size:** ~2GB (all models bundled)
+**Storage:**
+- Primary collection: L6 embeddings (fast)
+- Secondary collection: L12 embeddings (quality)
+- Weighted search combines both for optimal results
+
+**Image Size:** ~2GB (all models + dependencies)
+
+## Project Structure
+
+```
+memorizer-py/
+├── api.py                  # FastAPI REST API
+├── app.py                  # Streamlit UI
+├── mcp_server.py          # MCP server implementation
+├── models.py              # Pydantic data models
+├── config.py              # Configuration management
+├── services/              # Business logic
+│   ├── embeddings.py      # Dual embedding generation
+│   ├── llm.py             # LLM service
+│   └── storage.py         # ChromaDB storage
+├── Dockerfile             # Docker build
+├── docker-compose.yml     # Container orchestration
+├── requirements.txt       # Python dependencies
+└── models/                # Embedded models (not in git by default)
+    ├── sentence-transformers/  # L6 + L12 models
+    └── tinyllama-*.gguf   # LLM model
+```
+
+## Contributing
+
+For development guidelines and architecture details, see [CLAUDE.md](CLAUDE.md).
 
 ---
 
-**Version:** 2.0.0 | **Built for air-gapped environments** ❤️
+**Version:** 2.0.0 | **Built for air-gapped environments with dual embeddings** ❤️

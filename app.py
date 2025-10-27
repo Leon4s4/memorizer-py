@@ -206,6 +206,7 @@ with st.sidebar:
             "➕ Create Memory",
             "📊 Statistics",
             "🔧 Tools",
+            "⚙️ MCP Config",
             "⚙️ System Config"
         ],
         label_visibility="collapsed"
@@ -913,13 +914,20 @@ elif page == "🔧 Tools":
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Metadata Embedding Tool Card
-    st.html("""
+    # Dual Embedding Tool Card
+    dual_status = "Enabled" if settings.use_dual_embeddings else "Disabled"
+    dual_color = "#28a745" if settings.use_dual_embeddings else "#6c757d"
+
+    st.html(f"""
     <div class="search-card">
-        <h3 style="margin-top: 0;">🚀 Metadata Embedding</h3>
-        <p><strong>Generate or regenerate metadata embeddings for improved search performance.</strong></p>
+        <h3 style="margin-top: 0;">🚀 Dual Embedding System</h3>
+        <p><strong>Dual-model embedding system for superior search accuracy.</strong></p>
         <p style="color: #6c757d; margin-top: 1rem;">
-            This tool creates embeddings from memory titles and tags to enable better semantic search and organization.
+            Uses two embedding models in parallel: <strong>{settings.embedding_model_primary}</strong> (fast, 40% weight)
+            and <strong>{settings.embedding_model_secondary}</strong> (quality, 60% weight) for optimal search results.
+        </p>
+        <p style="margin-top: 0.5rem;">
+            <span style="color: {dual_color}; font-weight: bold;">● Status: {dual_status}</span>
         </p>
     </div>
     """)
@@ -1102,25 +1110,36 @@ elif page == "🔧 Tools":
                 embedding_coverage = 100.0  # ChromaDB automatically creates embeddings
                 total_vectors = total_count
 
+                dual_mode_status = "Enabled" if settings.use_dual_embeddings else "Disabled"
+                dual_mode_color = "#28a745" if settings.use_dual_embeddings else "#6c757d"
+
                 st.html(f"""
                 <div class="search-card">
-                    <h4 style="margin-top: 0;">🚀 Metadata Embedding Tool</h4>
+                    <h4 style="margin-top: 0;">🚀 Dual Embedding System</h4>
                     <div style="margin: 1rem 0;">
                         <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                            <span><strong>Coverage:</strong></span>
-                            <span style="color: #28a745;">{embedding_coverage:.1f}%</span>
+                            <span><strong>Dual-Model Mode:</strong></span>
+                            <span style="color: {dual_mode_color}; font-weight: bold;">{dual_mode_status}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span><strong>Primary Model (L6):</strong></span>
+                            <span>{settings.embedding_model_primary}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span><strong>Secondary Model (L12):</strong></span>
+                            <span>{settings.embedding_model_secondary}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                            <span><strong>Weight Distribution:</strong></span>
+                            <span>{int(settings.embedding_weight_primary * 100)}% / {int(settings.embedding_weight_secondary * 100)}%</span>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
                             <span><strong>Total Vectors:</strong></span>
-                            <span>{total_vectors:,}</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
-                            <span><strong>Vector Dimension:</strong></span>
-                            <span>384D</span>
+                            <span>{total_vectors:,} × 2 models</span>
                         </div>
                         <div style="display: flex; justify-content: space-between;">
-                            <span><strong>Status:</strong></span>
-                            <span style="color: #28a745;">All Embedded</span>
+                            <span><strong>Coverage:</strong></span>
+                            <span style="color: #28a745;">{embedding_coverage:.1f}%</span>
                         </div>
                     </div>
                 </div>
@@ -1518,6 +1537,238 @@ elif page == "🔧 Tools":
                     st.success("🎉 Your database is healthy! No issues detected.")
                 elif not auto_fix:
                     st.info("💡 Tip: Enable 'Auto-fix issues' to automatically resolve problems where possible.")
+
+elif page == "⚙️ MCP Config":
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 2rem; border-radius: 0.5rem; margin-bottom: 2rem; color: white;">
+        <h1 style="margin: 0; font-size: 2rem;">Model Context Protocol (MCP) Configuration</h1>
+        <p style="margin: 0.5rem 0 0 0; opacity: 0.9;">Connect Memorizer to your AI assistant using MCP</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Quick Start Section
+    st.html("""
+    <div class="search-card">
+        <h3 style="margin-top: 0;">🚀 Quick Start</h3>
+        <p>Memorizer provides an MCP (Model Context Protocol) server that allows AI assistants like Claude to interact with your memory database.</p>
+        <p style="margin-top: 1rem;"><strong>Available Tools:</strong></p>
+        <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
+            <li><code>store</code> - Store new memories in the database</li>
+            <li><code>search</code> - Search and retrieve memories using semantic search</li>
+            <li><code>get</code> - Retrieve a specific memory by ID</li>
+            <li><code>delete</code> - Remove a memory from the database</li>
+        </ul>
+    </div>
+    """)
+
+    # Claude Desktop Configuration
+    st.markdown("### 📱 Claude Desktop Configuration")
+
+    claude_config = f'''{{
+  "mcpServers": {{
+    "memorizer": {{
+      "command": "curl",
+      "args": [
+        "-N",
+        "-H",
+        "Accept: text/event-stream",
+        "{settings.canonical_url.replace(':8000', ':8800')}/sse"
+      ]
+    }}
+  }}
+}}'''
+
+    st.html(f"""
+    <div class="search-card">
+        <p>Add this configuration to your Claude Desktop config file:</p>
+        <p style="margin-top: 1rem;"><strong>Config file location:</strong></p>
+        <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
+            <li><strong>macOS:</strong> <code>~/Library/Application Support/Claude/claude_desktop_config.json</code></li>
+            <li><strong>Windows:</strong> <code>%APPDATA%\\Claude\\claude_desktop_config.json</code></li>
+        </ul>
+    </div>
+    """)
+
+    st.code(claude_config, language="json")
+
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        if st.button("📋 Copy Claude Desktop Config", use_container_width=True):
+            st.toast("✅ Configuration copied to clipboard!")
+
+    # VS Code Configuration
+    st.markdown("### 💻 VS Code (Claude Code) Configuration")
+
+    vscode_config = f'''{{
+  "mcpServers": {{
+    "memorizer": {{
+      "command": "curl",
+      "args": [
+        "-N",
+        "-H",
+        "Accept: text/event-stream",
+        "{settings.canonical_url.replace(':8000', ':8800')}/sse"
+      ]
+    }}
+  }}
+}}'''
+
+    st.html(f"""
+    <div class="search-card">
+        <p>Add this configuration to your VS Code settings:</p>
+        <p style="margin-top: 1rem;"><strong>Config file location:</strong></p>
+        <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
+            <li><strong>macOS:</strong> <code>~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json</code></li>
+            <li><strong>Windows:</strong> <code>%APPDATA%\\Code\\User\\globalStorage\\saoudrizwan.claude-dev\\settings\\cline_mcp_settings.json</code></li>
+        </ul>
+    </div>
+    """)
+
+    st.code(vscode_config, language="json")
+
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        if st.button("📋 Copy VS Code Config", use_container_width=True):
+            st.toast("✅ Configuration copied to clipboard!")
+
+    # GitHub Copilot Configuration
+    st.markdown("### 🐙 GitHub Copilot Configuration")
+
+    github_copilot_config = f'''{{
+  "memorizer-python": {{
+    "url": "{settings.canonical_url}",
+    "type": "http"
+  }}
+}}'''
+
+    st.html(f"""
+    <div class="search-card">
+        <p>Add this configuration to your GitHub Copilot MCP settings file:</p>
+        <p style="margin-top: 1rem;"><strong>Config file location:</strong></p>
+        <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
+            <li><strong>macOS:</strong> <code>~/Library/Application Support/Code - Insiders/User/mcp.json</code> or <code>~/Library/Application Support/Code/User/mcp.json</code></li>
+            <li><strong>Windows:</strong> <code>%APPDATA%\\Code\\User\\mcp.json</code></li>
+            <li><strong>Linux:</strong> <code>~/.config/Code/User/mcp.json</code></li>
+        </ul>
+        <p style="margin-top: 1rem; color: #6c757d;">
+            <strong>Note:</strong> This uses the simpler HTTP-based MCP configuration. Make sure the Memorizer service is running on port 8000.
+        </p>
+    </div>
+    """)
+
+    st.code(github_copilot_config, language="json")
+
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        if st.button("📋 Copy GitHub Copilot Config", use_container_width=True):
+            st.toast("✅ Configuration copied to clipboard!")
+
+    # Connection Details
+    st.markdown("### 🔌 Connection Details")
+
+    st.html(f"""
+    <div class="search-card">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+            <div>
+                <p><strong>MCP Server URL</strong></p>
+                <p><code>{settings.canonical_url.replace(':8000', ':8800')}</code></p>
+                <br>
+                <p><strong>Protocol</strong></p>
+                <p>HTTP with Server-Sent Events (SSE)</p>
+            </div>
+            <div>
+                <p><strong>API Port</strong></p>
+                <p><code>8800</code></p>
+                <br>
+                <p><strong>Status</strong></p>
+                <p><span style="color: #28a745; font-weight: bold;">● Running</span></p>
+            </div>
+        </div>
+    </div>
+    """)
+
+    # System Prompt Section
+    st.markdown("### 🧠 Example System Prompt for LLMs")
+
+    st.html("""
+    <div class="search-card" style="border-left: 4px solid #667eea;">
+        <p style="background: #f8f9fa; padding: 0.75rem; border-radius: 0.25rem; margin-bottom: 1rem;">
+            <strong>⚡ Pro Tip:</strong> Add this system prompt to your <code>AGENT.md</code>, Cursor Rules files, or any AI agent configuration!
+            This will dramatically improve how often and effectively your LLM uses the Memorizer service for persistent memory management.
+        </p>
+    </div>
+    """)
+
+    system_prompt = """You have access to a long-term memory system via the Model Context Protocol (MCP) at the endpoint **memorizer**. Use the following tools:
+
+- **store**: Store a new memory. Parameters: `type`, `content` (markdown), `source`, `tags`, `confidence`, `relatedTo` (optional, memory ID), `relationshipType` (optional).
+- **search**: Search for similar memories. Parameters: `query`, `limit`, `minSimilarity`, `filterTags`.
+- **get**: Retrieve a memory by ID. Parameter: `id`.
+- **getMany**: Retrieve multiple memories by their IDs. Parameter: `ids` (list of IDs).
+- **delete**: Delete a memory by ID. Parameter: `id`.
+- **createRelationship**: Create a relationship between two memories. Parameters: `fromId`, `toId`, `type`.
+
+Use these tools to remember, recall, relate, and manage information as needed to assist the user. You can also manually retrieve or relate memories by their IDs when necessary."""
+
+    st.code(system_prompt, language="markdown")
+
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        if st.button("📋 Copy System Prompt", use_container_width=True):
+            st.toast("✅ System prompt copied to clipboard!")
+
+    # Example Usage
+    st.markdown("### 💡 Example Usage")
+
+    st.html("""
+    <div class="search-card">
+        <p>Once configured, you can use these commands in your AI assistant:</p>
+        <br>
+        <p><strong>Store a memory:</strong></p>
+        <p style="margin-left: 1rem; color: #6c757d;">"Remember that the project deadline is next Friday"</p>
+        <br>
+        <p><strong>Search memories:</strong></p>
+        <p style="margin-left: 1rem; color: #6c757d;">"What did I save about project deadlines?"</p>
+        <br>
+        <p><strong>Retrieve specific memory:</strong></p>
+        <p style="margin-left: 1rem; color: #6c757d;">"Show me the memory with ID abc123"</p>
+    </div>
+    """)
+
+    # Action Buttons
+    st.markdown("### 📊 Quick Actions")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("📊 View Statistics", use_container_width=True):
+            st.switch_page
+    with col2:
+        if st.button("📋 Browse Memories", use_container_width=True):
+            st.switch_page
+    with col3:
+        if st.button("🔧 System Config", use_container_width=True):
+            st.switch_page
+
+    # Troubleshooting
+    st.markdown("### 🔍 Troubleshooting")
+
+    st.html("""
+    <div class="search-card">
+        <p><strong>Connection Issues?</strong></p>
+        <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
+            <li>Ensure the Memorizer service is running on port 8800</li>
+            <li>Check that the URL in your config matches your deployment</li>
+            <li>For Docker deployments, ensure port 8800 is exposed</li>
+            <li>Restart your AI assistant after updating the configuration</li>
+        </ul>
+        <br>
+        <p><strong>Not seeing the tools?</strong></p>
+        <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
+            <li>Verify the JSON configuration is valid (no syntax errors)</li>
+            <li>Check the assistant logs for MCP connection errors</li>
+            <li>Try removing and re-adding the configuration</li>
+        </ul>
+    </div>
+    """)
 
 elif page == "⚙️ System Config":
     st.markdown("""
