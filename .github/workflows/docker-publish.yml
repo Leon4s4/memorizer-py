@@ -77,8 +77,8 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=amd64
-          cache-to: type=gha,mode=max,scope=amd64
+          cache-from: type=gha,scope=buildkit-amd64
+          cache-to: type=gha,mode=max,scope=buildkit-amd64
           provenance: false
           outputs: type=image,name=${{ env.DOCKER_IMAGE }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
 
@@ -158,8 +158,8 @@ jobs:
           file: ./Dockerfile
           platforms: linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=arm64
-          cache-to: type=gha,mode=max,scope=arm64
+          cache-from: type=gha,scope=buildkit-arm64
+          cache-to: type=gha,mode=max,scope=buildkit-arm64
           provenance: false
           outputs: type=image,name=${{ env.DOCKER_IMAGE }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
 
