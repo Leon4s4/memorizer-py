@@ -1,0 +1,44 @@
+version: '3.8'
+
+# Air-gapped deployment using pre-loaded Docker image
+#
+# Setup instructions:
+# 1. On internet-connected machine:
+#    docker pull leon4s4/memorizer-py:latest
+#    docker save leon4s4/memorizer-py:latest -o memorizer-latest.tar
+#
+# 2. Transfer memorizer-latest.tar to air-gapped machine
+#
+# 3. On air-gapped machine:
+#    docker load -i memorizer-latest.tar
+#    docker-compose -f docker-compose.airgap.yml up -d
+
+services:
+  memorizer:
+    image: leon4s4/memorizer-py:latest
+    container_name: memorizer
+    restart: unless-stopped
+    ports:
+      - "9000:8000"  # API (host:container)
+      - "8501:8501"  # Streamlit UI
+      - "8800:8800"  # MCP HTTP Server
+    volumes:
+      - memorizer-data:/app/data
+      # Optional: mount local models directory if you want to update models
+      # - ./models:/app/models
+    environment:
+      - MEMORIZER_ENVIRONMENT=production
+      - MEMORIZER_ENABLE_BACKGROUND_JOBS=true
+      - CHROMA_TELEMETRY_IMPL=none
+      - PYTORCH_ENABLE_MPS_FALLBACK=1
+      - TRANSFORMERS_VERBOSITY=error
+      - TOKENIZERS_PARALLELISM=false
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  memorizer-data:
