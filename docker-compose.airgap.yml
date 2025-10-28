@@ -15,7 +15,7 @@ version: '3.8'
 
 services:
   memorizer:
-    image: leon4s4/memorizer-py:latest
+    image: leonasa/memorizer-py:latest
     container_name: memorizer
     restart: unless-stopped
     ports:
@@ -33,6 +33,10 @@ services:
       - PYTORCH_ENABLE_MPS_FALLBACK=1
       - TRANSFORMERS_VERBOSITY=error
       - TOKENIZERS_PARALLELISM=false
+      # Force offline mode for all HuggingFace libraries
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+      - HF_DATASETS_OFFLINE=1
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
       interval: 30s

@@ -98,6 +98,11 @@ ENV MEMORIZER_LLM_MODEL_PATH=/app/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf
 ENV CHROMA_TELEMETRY_IMPL=none
 ENV PYTORCH_ENABLE_MPS_FALLBACK=1
 
+# Force offline mode for HuggingFace libraries (air-gapped deployment)
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
+ENV HF_DATASETS_OFFLINE=1
+
 # Expose ports
 EXPOSE 8000 8501 8800
 
