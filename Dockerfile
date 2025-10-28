@@ -55,9 +55,9 @@ USER memorizer
 ENV PATH=/home/memorizer/.local/bin:$PATH
 ENV SENTENCE_TRANSFORMERS_HOME=/app/models/sentence-transformers
 
-# Copy pre-bundled embedding models from repository (no download needed)
+# Copy pre-bundled embedding models from Git LFS repository (air-gapped, no downloads)
 # L6 model (~90MB) for fast embeddings, L12 model (~133MB) for high-quality embeddings
-# Models are stored in Git LFS and copied during build for air-gapped deployment
+# Models stored in Git LFS, pulled by GitHub Actions with 'lfs: true', copied during build
 COPY --chown=memorizer:memorizer models/sentence-transformers /app/models/sentence-transformers
 
 RUN echo "Embedding models copied from repository..." && \
