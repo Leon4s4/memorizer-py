@@ -227,6 +227,17 @@ jobs:
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.DOCKER_IMAGE }}@sha256:%s ' *)
 
+      - name: Determine tag for inspection
+        id: inspect-tag
+        run: |
+          set -euo pipefail
+          tag=$(jq -r '.tags[0] // "" | split(":") | .[-1]' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          if [ -z "$tag" ]; then
+            echo "::warning::No tag found in metadata output; defaulting to 'latest'"
+            tag="latest"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
       - name: Inspect image
         run: |
-          docker buildx imagetools inspect ${{ env.DOCKER_IMAGE }}:${{ steps.meta.outputs.version }}
+          docker buildx imagetools inspect ${{ env.DOCKER_IMAGE }}:${{ steps.inspect-tag.outputs.tag }}
