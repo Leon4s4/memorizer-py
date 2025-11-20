@@ -231,7 +231,7 @@ jobs:
         id: inspect-tag
         run: |
           set -euo pipefail
-          tag=$(jq -r '.tags[0] // ""' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+          tag=$(jq -r '.tags[0] // "" | split(":") | .[-1]' <<< "$DOCKER_METADATA_OUTPUT_JSON")
           if [ -z "$tag" ]; then
             echo "::warning::No tag found in metadata output; defaulting to 'latest'"
             tag="latest"
