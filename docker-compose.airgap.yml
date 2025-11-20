@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Air-gapped deployment using pre-loaded Docker image
 #
 # Setup instructions:

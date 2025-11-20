@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Air-gapped deployment configuration (DEFAULT)
 # Uses Dockerfile which includes ALL models (air-gapped by default as of v2.0)
 
