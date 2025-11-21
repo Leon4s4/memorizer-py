@@ -246,6 +246,27 @@ class StorageService:
             logger.error(f"Error deleting memory {memory_id}: {e}")
             return False
 
+    def _keyword_search(self, query: str, all_memories: list[Memory]) -> dict[str, float]:
+        """
+        Simple keyword-based search using BM25-like scoring.
+
+        Returns:
+            Dict mapping memory_id to keyword relevance score (0.0-1.0)
+        """
+        query_terms = set(query.lower().split())
+        scores = {}
+
+        for memory in all_memories:
+            text = memory.text.lower()
+            # Count matching terms
+            matches = sum(1 for term in query_terms if term in text)
+            if matches > 0:
+                # Normalize by query length
+                score = matches / len(query_terms)
+                scores[str(memory.id)] = score
+
+        return scores
+
     def search(
         self,
         query: str,
@@ -255,7 +276,7 @@ class StorageService:
         threshold: Optional[float] = None
     ) -> list[Memory]:
         """
-        Search memories using semantic similarity.
+        Hybrid search combining semantic similarity and keyword matching.
 
         Args:
             query: Search query
@@ -268,6 +289,12 @@ class StorageService:
             List of matching memories with similarity scores
         """
         logger.info(f"Searching memories: query='{query}', limit={limit}, tags={tags}")
+
+        # Get all memories for keyword search
+        all_memories = self.list_all(limit=1000)
+
+        # Perform keyword search
+        keyword_scores = self._keyword_search(query, all_memories)
 
         # Generate dual query embeddings
         if settings.use_dual_embeddings:
@@ -296,26 +323,35 @@ class StorageService:
 
         # Process primary (L6) results
         for idx, memory_id in enumerate(primary_results['ids'][0]):
-            # Convert distance to similarity (1 - distance for L2)
-            similarity = 1.0 - primary_results['distances'][0][idx]
-            combined_scores[memory_id] = {'primary': similarity, 'secondary': 0.0}
+            distance = primary_results['distances'][0][idx]
+            # Convert distance to similarity using cosine similarity formula
+            # ChromaDB returns squared L2 distance, convert to cosine similarity
+            # similarity = 1 - (distance / 2)  # For normalized vectors
+            # Clamp to [0, 1] range to handle any numerical issues
+            similarity = max(0.0, min(1.0, 1.0 - (distance / 2.0)))
+            combined_scores[memory_id] = {'primary': similarity, 'secondary': 0.0, 'document': primary_results['documents'][0][idx]}
 
         # Process secondary (L12) results
         for idx, memory_id in enumerate(secondary_results['ids'][0]):
-            similarity = 1.0 - secondary_results['distances'][0][idx]
+            distance = secondary_results['distances'][0][idx]
+            similarity = max(0.0, min(1.0, 1.0 - (distance / 2.0)))
             if memory_id in combined_scores:
                 combined_scores[memory_id]['secondary'] = similarity
             else:
-                combined_scores[memory_id] = {'primary': 0.0, 'secondary': similarity}
+                combined_scores[memory_id] = {'primary': 0.0, 'secondary': similarity, 'document': secondary_results['documents'][0][idx]}
 
         # Calculate final scores using weighted combination
         final_scores = []
         for memory_id, scores in combined_scores.items():
             # Weighted average: 40% L6 (fast) + 60% L12 (quality)
-            weighted_similarity = (
+            semantic_similarity = (
                 scores['primary'] * settings.embedding_weight_primary +
                 scores['secondary'] * settings.embedding_weight_secondary
             )
+
+            # Add keyword boost (30% weight for keyword matching)
+            keyword_score = keyword_scores.get(memory_id, 0.0)
+            hybrid_similarity = (semantic_similarity * 0.7) + (keyword_score * 0.3)
 
             # Tag boosting
             metadata = next(
@@ -329,29 +365,37 @@ class StorageService:
                 memory_tags_str = metadata.get('tags', '')
                 memory_tags = [tag.strip() for tag in memory_tags_str.split(',') if tag.strip()] if isinstance(memory_tags_str, str) else memory_tags_str
                 if any(tag in memory_tags for tag in tags):
-                    weighted_similarity += settings.tag_boost
+                    hybrid_similarity += settings.tag_boost
 
-            final_scores.append((memory_id, weighted_similarity, metadata))
+            final_scores.append((memory_id, hybrid_similarity, semantic_similarity, keyword_score, metadata))
 
-        # Sort by similarity
+        # Sort by hybrid similarity
         final_scores.sort(key=lambda x: x[1], reverse=True)
 
-        # Apply threshold
+        # Apply threshold (use lower threshold for hybrid search since it combines scores)
         similarity_threshold = threshold if threshold is not None else settings.similarity_threshold
-        filtered_scores = [s for s in final_scores if s[1] >= similarity_threshold]
+        # Adjust threshold for hybrid scoring (multiply by 0.7 to account for keyword component)
+        adjusted_threshold = similarity_threshold * 0.7
+        filtered_scores = [s for s in final_scores if s[1] >= adjusted_threshold]
 
         # Fallback if no results
         if not filtered_scores and use_fallback:
             logger.info("No results with standard threshold, trying fallback")
             fallback = settings.fallback_threshold if threshold is None else max(0.0, similarity_threshold - 0.1)
-            filtered_scores = [s for s in final_scores if s[1] >= fallback]
+            adjusted_fallback = fallback * 0.7
+            filtered_scores = [s for s in final_scores if s[1] >= adjusted_fallback]
+
+        # If still no results, return top results regardless of threshold
+        if not filtered_scores and final_scores:
+            logger.info("No results with any threshold, returning top matches")
+            filtered_scores = final_scores[:limit]
 
         # Limit results
         filtered_scores = filtered_scores[:limit]
 
         # Convert to Memory objects
         memories = []
-        for memory_id, similarity, metadata in filtered_scores:
+        for memory_id, hybrid_sim, semantic_sim, keyword_sim, metadata in filtered_scores:
             if metadata:
                 metadata['id'] = UUID(metadata['id'])
                 metadata['created_at'] = datetime.fromisoformat(metadata['created_at'])
@@ -366,8 +410,11 @@ class StorageService:
                     metadata['content'] = {"text": metadata['text']}
 
                 memory = Memory(**metadata)
-                memory.similarity = similarity
+                # Store the hybrid similarity as the main score
+                memory.similarity = hybrid_sim
                 memories.append(memory)
+
+                logger.debug(f"Memory {memory_id[:8]}: hybrid={hybrid_sim:.3f} (semantic={semantic_sim:.3f}, keyword={keyword_sim:.3f})")
 
         logger.info(f"Found {len(memories)} memories")
         return memories
