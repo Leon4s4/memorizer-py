@@ -35,6 +35,7 @@ class Memory(BaseModel):
     tags: list[str] = Field(default_factory=list)
     confidence: float = 1.0
     title: Optional[str] = None
+    event_date: Optional[datetime] = None  # Date this memory refers to
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -57,6 +58,7 @@ class MemoryCreate(BaseModel):
     tags: list[str] = Field(default_factory=list)
     confidence: float = 1.0
     title: Optional[str] = None
+    event_date: Optional[datetime] = None
     relationships: list[dict[str, Any]] = Field(default_factory=list)
 
 
@@ -76,6 +78,8 @@ class MemorySearchRequest(BaseModel):
     limit: int = 10
     tags: list[str] = Field(default_factory=list)
     include_relationships: bool = False
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
 
 
 class MemorySearchResponse(BaseModel):

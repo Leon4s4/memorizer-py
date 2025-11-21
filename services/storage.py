@@ -119,6 +119,8 @@ class StorageService:
         memory_dict = memory.model_dump(exclude={'embedding', 'embedding_metadata', 'similarity', 'relationships', 'content'})
         memory_dict['created_at'] = memory.created_at.isoformat()
         memory_dict['updated_at'] = memory.updated_at.isoformat()
+        if memory.event_date:
+            memory_dict['event_date'] = memory.event_date.isoformat()
         memory_dict['id'] = str(memory.id)
 
         # Convert tags list to comma-separated string for ChromaDB (doesn't support lists in metadata)
@@ -169,6 +171,8 @@ class StorageService:
             metadata['id'] = UUID(metadata['id'])
             metadata['created_at'] = datetime.fromisoformat(metadata['created_at'])
             metadata['updated_at'] = datetime.fromisoformat(metadata['updated_at'])
+            if 'event_date' in metadata and metadata['event_date']:
+                metadata['event_date'] = datetime.fromisoformat(metadata['event_date'])
 
             # Convert tags from comma-separated string back to list
             if 'tags' in metadata and isinstance(metadata['tags'], str):
@@ -400,6 +404,8 @@ class StorageService:
                 metadata['id'] = UUID(metadata['id'])
                 metadata['created_at'] = datetime.fromisoformat(metadata['created_at'])
                 metadata['updated_at'] = datetime.fromisoformat(metadata['updated_at'])
+                if 'event_date' in metadata and metadata['event_date']:
+                    metadata['event_date'] = datetime.fromisoformat(metadata['event_date'])
 
                 # Convert tags from comma-separated string back to list
                 if 'tags' in metadata and isinstance(metadata['tags'], str):
@@ -443,6 +449,8 @@ class StorageService:
             metadata['id'] = UUID(metadata['id'])
             metadata['created_at'] = datetime.fromisoformat(metadata['created_at'])
             metadata['updated_at'] = datetime.fromisoformat(metadata['updated_at'])
+            if 'event_date' in metadata and metadata['event_date']:
+                metadata['event_date'] = datetime.fromisoformat(metadata['event_date'])
 
             # Convert tags from comma-separated string back to list
             if 'tags' in metadata and isinstance(metadata['tags'], str):

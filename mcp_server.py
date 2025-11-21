@@ -80,6 +80,11 @@ async def list_tools() -> list[Tool]:
                         "type": "string",
                         "description": "Optionally, the type of relationship to create (e.g., 'example-of', 'explains', 'related-to'). Use relationships to connect related knowledge.",
                         "enum": ["related-to", "example-of", "explains", "contradicts", "depends-on", "supersedes"]
+                    },
+                    "eventDate": {
+                        "type": "string",
+                        "description": "Optional ISO 8601 date string (YYYY-MM-DD) for when this event/memory occurred. Use for tracking daily status, progress over time, or temporal comparisons.",
+                        "format": "date"
                     }
                 },
                 "required": ["type", "text", "source", "title"]
@@ -234,6 +239,16 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
 
 async def handle_store(args: dict[str, Any]) -> list[TextContent]:
     """Handle the 'store' tool."""
+    from datetime import datetime
+
+    # Parse event_date if provided
+    event_date = None
+    if "eventDate" in args and args["eventDate"]:
+        try:
+            event_date = datetime.fromisoformat(args["eventDate"])
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Invalid eventDate format: {args['eventDate']}, error: {e}")
+
     # Create memory
     memory = Memory(
         type=args["type"],
@@ -242,7 +257,8 @@ async def handle_store(args: dict[str, Any]) -> list[TextContent]:
         source=args["source"],
         title=args["title"],
         tags=args.get("tags", []),
-        confidence=args.get("confidence", 1.0)
+        confidence=args.get("confidence", 1.0),
+        event_date=event_date
     )
 
     # Store in database
